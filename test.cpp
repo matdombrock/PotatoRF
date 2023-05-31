@@ -86,7 +86,7 @@ private:
 		"settings",
 		"unix time",
 		"oled demo",
-		"hack 3"};
+		"bit banger"};
 };
 
 class Hack1
@@ -137,13 +137,13 @@ int main()
 	//
 	Hack1 hack1;
 	//
-	Button backBtn("gpiochip1", 91);
+	Button backBtn("gpiochip1", 83);
 	Button btn("gpiochip1", 98);
 	Rotary rot(
 		"gpiochip0", 9,
 		"gpiochip0", 10
 	);
-	BitBang bitb("gpiochip1", 92);
+	BitBang bitb("gpiochip1", 82);
 	btn.setToggleMode();
 	uint8_t rc = 0;
 	rc += init();
