@@ -7,10 +7,10 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <ctime>
-#include "ssd1306.h"
-#include "Button.h"
-#include "Rotary.h"
-#include "BitBang.h"
+#include "ssd1306/ssd1306.h"
+#include "GPIO/Button.h"
+#include "GPIO/Rotary.h"
+#include "GPIO/BitBang.h"
 
 class State
 {
