@@ -12,10 +12,11 @@
 #include "GPIO/Rotary.h"
 #include "GPIO/BitBang.h"
 
-class State
-{
+class State{
 public:
-	int r1 = 0;
+	int appIndex = -1;
+	int tick = 0;
+	int utime = (int)time(NULL);
 };
 
 class Menu
@@ -89,11 +90,20 @@ private:
 		"bit banger"};
 };
 
-class Hack1
+class App{
+public:
+	App(){};
+	~App(){};
+	virtual int run(State * st){
+		return 0;
+	};
+};
+
+class App_Hack1: public App
 {
 public:
-	Hack1(){};
-	void run(){
+	App_Hack1(){};
+	int run(State * st) override{
 		uint8_t rc = 0;
 		int font = 0;
 		int ts = (int)time(NULL);
@@ -112,9 +122,45 @@ public:
 		}
 		rc += ssd1306_oled_set_XY(i*8, i);
 		rc += ssd1306_oled_write_line(font, (uint8_t*)msgs[i]);
+		return 0;
 	}
 private:
 	bool cleared = false;
+};
+
+class App_UnixTime: public App{
+public:
+	int run(State * st) override{
+		uint8_t rc = 0;
+		int font = 1;
+		char tss[16];
+		sprintf(tss, "%d", st->utime);
+		rc += ssd1306_oled_set_XY(0, 0);
+		rc += ssd1306_oled_write_line(font, (uint8_t*)">>Unix Time:");
+		rc += ssd1306_oled_set_XY(0, 2);
+		rc += ssd1306_oled_write_line(font, (uint8_t*)tss);
+		return 0;
+	}
+};
+
+class App_BitBang: public App{
+public:
+	App_BitBang(BitBang * bitb){
+		gpio = bitb;
+	}
+	int run(State * st) override{
+		uint8_t rc = 0;
+		int font = 0;
+		char tss[16];
+		sprintf(tss, "%d", st->utime % 2);
+		rc += ssd1306_oled_set_XY(0, 0);
+		rc += ssd1306_oled_write_line(font, (uint8_t*)">>Banger:");
+		rc += ssd1306_oled_set_XY(0, 2);
+		rc += ssd1306_oled_write_line(font, (uint8_t*)tss);
+		gpio->set(st->utime % 2);
+		return 0;
+	}
+	BitBang * gpio;
 };
 
 int init()
@@ -130,13 +176,13 @@ int init()
 	return rc;
 }
 
+
+
 int main()
 {
-	State state;
+	State st;
 	Menu menu;
-	//
-	Hack1 hack1;
-	//
+	
 	Button backBtn("gpiochip1", 83);
 	Button btn("gpiochip1", 98);
 	Rotary rot(
@@ -144,31 +190,38 @@ int main()
 		"gpiochip0", 10
 	);
 	BitBang bitb("gpiochip1", 82);
+	//
+	App_Hack1 app_hack1;
+	App_UnixTime app_unixTime;
+	App_BitBang app_bitBang(&bitb);
+	//
+	
 	btn.setToggleMode();
 	uint8_t rc = 0;
 	rc += init();
-	int appIndex = -1;
-	int i = 0;
+	st.appIndex = -1;
+	st.tick = 0;
 	while (1)
 	{
+		st.utime = (int)time(NULL);
 		//sleep(0.1);
 		int font = 0;
-		int tempAppIndex = appIndex;
-		if(backBtn.changed() && appIndex != -1){
+		int tempAppIndex = st.appIndex;
+		if(backBtn.changed() && st.appIndex != -1){
 			printf("back\n");
 			// Ensure no rotation carries over
 			rot.clear();
 			// Reset index
-			appIndex = menu.run(&rot, &btn, 1);	
+			st.appIndex = menu.run(&rot, &btn, 1);	
 		}
-		if(appIndex == -1){
+		if(st.appIndex == -1){
 			tempAppIndex = menu.run(&rot, &btn);
 		}
 		// Switch apps
 		switch(tempAppIndex){
 			case 0:
 			{
-				if(appIndex != 0){
+				if(st.appIndex != 0){
 					rc += ssd1306_oled_clear_screen();	
 				}
 				rc += ssd1306_oled_set_XY(0, 0);
@@ -178,44 +231,31 @@ int main()
 			}
 			case 1:
 			{
-				if(appIndex != 1){
+				if(st.appIndex != 1){
 					rc += ssd1306_oled_clear_screen();	
 				}
-				int ts = (int)time(NULL);
-				char tss[16];
-				sprintf(tss, "%d", ts);
-				rc += ssd1306_oled_set_XY(0, 0);
-				rc += ssd1306_oled_write_line(font, (uint8_t*)">>Unix Time:");
-				rc += ssd1306_oled_set_XY(0, 2);
-				rc += ssd1306_oled_write_line(font, (uint8_t*)tss);
+				app_unixTime.run(&st);
 				break;
 			}
 			case 2:
 			{
-				if(appIndex != 2){
+				if(st.appIndex != 2){
 					rc += ssd1306_oled_clear_screen();	
 				}
-				hack1.run();
+				app_hack1.run(&st);
 				break;
 			}
 			case 3:
 			{
-				if(appIndex != 3){
+				if(st.appIndex != 3){
 					rc += ssd1306_oled_clear_screen();	
 				}
-				int ts = (int)time(NULL);
-				char tss[16];
-				sprintf(tss, "%d", ts%2);
-				rc += ssd1306_oled_set_XY(0, 0);
-				rc += ssd1306_oled_write_line(font, (uint8_t*)">>Banger:");
-				rc += ssd1306_oled_set_XY(0, 2);
-				rc += ssd1306_oled_write_line(font, (uint8_t*)tss);
-				bitb.set(ts%2);
+				app_bitBang.run(&st);
 				break;
 			}
 		}
-		appIndex = tempAppIndex;
-		i++;
+		st.appIndex = tempAppIndex;
+		st.tick++;
 	}
 	return 0;
 }
